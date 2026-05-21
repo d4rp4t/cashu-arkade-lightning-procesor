@@ -65,12 +65,15 @@ public sealed class ArkSwapOnchainService(
         await using var _ = await safetyService.LockKeyAsync(lockKey, ct);
 
         var swapId = await swapsManagementService.InitiateArkToBtcChainSwap(walletId, amountSats, destination, ct);
+        var now = DateTimeOffset.UtcNow;
 
-        var swaps = await swapStorage.GetSwaps(walletIds: [walletId], swapIds: [swapId], cancellationToken: ct);
-        var swap = swaps.FirstOrDefault()
-            ?? throw new InvalidOperationException("Failed to locate created chain swap");
-
-        return MapOutgoing(swap);
+        return new OnchainOutgoingPayment(
+            SwapId: swapId,
+            BtcDestination: btcAddress,
+            AmountSats: amountSats,
+            Status: ArkSwapStatus.Pending,
+            CreatedAt: now,
+            UpdatedAt: now);
     }
 
     public async Task<OnchainIncomingPayment?> GetIncomingBySwapId(string walletId, string swapId, CancellationToken ct)

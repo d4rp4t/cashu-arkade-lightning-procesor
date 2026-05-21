@@ -68,8 +68,11 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
 
         try
         {
-            var inLimits = await _onchain.GetIncomingLimitsAsync(context.CancellationToken);
-            var outLimits = await _onchain.GetOutgoingLimitsAsync(context.CancellationToken);
+            var inTask = _onchain.GetIncomingLimitsAsync(context.CancellationToken);
+            var outTask = _onchain.GetOutgoingLimitsAsync(context.CancellationToken);
+            await Task.WhenAll(inTask, outTask);
+            var inLimits = inTask.Result;
+            var outLimits = outTask.Result;
             if (inLimits is not null || outLimits is not null)
             {
                 response.Onchain = new Proto.OnchainSettings
@@ -180,9 +183,7 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
                             $"Amount {amountSats} sats exceeds maximum {limits.MaxAmount} sats for onchain send");
                 }
 
-                var feeSats = limits is not null
-                    ? (ulong)Math.Ceiling(amountSats * (double)limits.FeePercentage / 100.0) + (ulong)limits.MinerFee
-                    : 0UL;
+                var feeSats = limits is not null ? CalculateFeeSats(amountSats, limits) : 0UL;
 
                 var quoteResponse = new Proto.PaymentQuoteResponse
                 {
@@ -221,9 +222,7 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
                     throw new PaymentValidationException($"Amount {bolt11AmountSats} sats exceeds maximum {bolt11Limits.MaxAmount} sats for melt");
             }
 
-            var bolt11FeeSats = bolt11Limits is not null
-                ? (ulong)Math.Ceiling(bolt11AmountSats * (double)bolt11Limits.FeePercentage / 100.0) + (ulong)bolt11Limits.MinerFee
-                : 0UL;
+            var bolt11FeeSats = bolt11Limits is not null ? CalculateFeeSats(bolt11AmountSats, bolt11Limits) : 0UL;
 
             return new Proto.PaymentQuoteResponse
             {
@@ -330,24 +329,11 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
             {
                 var payment = await _onchain.GetOutgoingBySwapId(
                     _context.Options.WalletId, request.RequestIdentifier.Id, context.CancellationToken);
-                if (payment is null)
-                    return new Proto.MakePaymentResponse
-                    {
-                        Status = Proto.QuoteState.Unknown,
-                        TotalSpent = new Proto.AmountMessage { Value = 0, Unit = _context.Options.Unit }
-                    };
-                return MapOnchainOutgoing(payment);
+                return payment is null ? UnknownOutgoingResponse() : MapOnchainOutgoing(payment);
             }
 
             var lightningPayment = await ResolveOutgoing(request.RequestIdentifier, context.CancellationToken);
-            if (lightningPayment is null)
-                return new Proto.MakePaymentResponse
-                {
-                    Status = Proto.QuoteState.Unknown,
-                    TotalSpent = new Proto.AmountMessage { Value = 0, Unit = _context.Options.Unit }
-                };
-
-            return MapLightningOutgoing(lightningPayment);
+            return lightningPayment is null ? UnknownOutgoingResponse() : MapLightningOutgoing(lightningPayment);
         }
         catch (RpcException) { throw; }
         catch (OperationCanceledException) { throw; }
@@ -545,6 +531,12 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
             }
         };
     }
+
+    private Proto.MakePaymentResponse UnknownOutgoingResponse() =>
+        new() { Status = Proto.QuoteState.Unknown, TotalSpent = new Proto.AmountMessage { Value = 0, Unit = _context.Options.Unit } };
+
+    private static ulong CalculateFeeSats(long amountSats, BoltzLimits limits)
+        => (ulong)Math.Ceiling(amountSats * (double)limits.FeePercentage / 100.0) + (ulong)limits.MinerFee;
 
     private static RpcException BadRequest(string message)
         => new(new Status(StatusCode.InvalidArgument, message));
