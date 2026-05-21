@@ -1,6 +1,6 @@
 using cdk_arkade_payment_processor.Configuration;
 using cdk_arkade_payment_processor.Services;
-using Microsoft.EntityFrameworkCore;
+using Grpc.Core;
 using Microsoft.Extensions.Options;
 using NArk.Abstractions.Wallets;
 using NArk.Core.Transport;
@@ -19,11 +19,11 @@ await EnsureProcessorWalletAsync(app.Services);
 
 app.Use(async (ctx, next) =>
 {
-    ctx.Response.OnStarting(() =>
+    if (!ctx.ValidateVersion())
     {
-        ctx.Response.Headers["x-cdk-protocol-version"] = "3.0";
-        return Task.CompletedTask;
-    });
+        throw new RpcException(new Status(StatusCode.FailedPrecondition,
+                $"Invalid protocol version! Expected: {VersionValidatoor.ProtocolVersion}"));
+    }
     await next();
 });
 
