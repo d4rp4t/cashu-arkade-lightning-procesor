@@ -17,6 +17,16 @@ var app = builder.Build();
 await app.Services.GetRequiredService<MigrationRunner>().ExecuteAsync();
 await EnsureProcessorWalletAsync(app.Services);
 
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.OnStarting(() =>
+    {
+        ctx.Response.Headers["x-cdk-protocol-version"] = "3.0";
+        return Task.CompletedTask;
+    });
+    await next();
+});
+
 app.MapGrpcService<CdkPaymentProcessorGrpcService>();
 app.MapGet("/", () => "CDK Arkade payment processor gRPC server");
 
