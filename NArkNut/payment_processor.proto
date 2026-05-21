@@ -130,6 +130,7 @@ message PaymentIdentifier {
 
 message OnchainIncomingPaymentOptions {
   string quote_id = 1;
+  AmountMessage amount = 2;
 }
 
 message IncomingPaymentOptions {
