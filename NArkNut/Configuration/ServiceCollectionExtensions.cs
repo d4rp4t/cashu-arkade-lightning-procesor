@@ -68,6 +68,7 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<BoltzClient>(sp => sp.GetRequiredService<CachedBoltzClient>());
         services.AddSingleton<ArkSwapLightningService>();
+        services.AddSingleton<ArkSwapOnchainService>();
         services.AddSingleton<IncomingPaymentEventBus>();
         services.AddSingleton<MigrationRunner>();
         services.AddGrpc();
