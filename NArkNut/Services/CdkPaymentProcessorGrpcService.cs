@@ -71,6 +71,9 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
     {
         try
         {
+            if (request.Options?.Onchain is not null)
+                throw NotImplemented("Onchain incoming payments are not implemented");
+
             var bolt11 = request.Options?.Bolt11 ?? throw BadRequest("Only bolt11 incoming options are supported");
             var amount = bolt11.Amount?.Value ?? 0;
             if (amount == 0) throw BadRequest("Amount is required");
@@ -119,6 +122,9 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
     {
         try
         {
+            if (request.RequestType == Proto.OutgoingPaymentRequestType.Onchain)
+                throw NotImplemented("Onchain payment quotes are not implemented");
+
             if (request.RequestType != Proto.OutgoingPaymentRequestType.Bolt11Invoice)
                 throw BadRequest("Only bolt11 outgoing quote is supported");
 
@@ -171,6 +177,9 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
     {
         try
         {
+            if (request.PaymentOptions?.Onchain is not null)
+                throw NotImplemented("Onchain payments are not implemented");
+
             var bolt11 = request.PaymentOptions?.Bolt11?.Bolt11;
             if (string.IsNullOrWhiteSpace(bolt11)) throw BadRequest("Only bolt11 outgoing payment is supported");
 
@@ -390,4 +399,7 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
 
     private static RpcException BadRequest(string message)
         => new(new Status(StatusCode.InvalidArgument, message));
+
+    private static RpcException NotImplemented(string message)
+        => new(new Status(StatusCode.Unimplemented, message));
 }
