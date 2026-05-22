@@ -43,7 +43,10 @@ services:
     restart: unless-stopped
 
   cdk-mintd:
-    image: cashubtc/mintd:latest
+    image: cdk-mintd:master
+    build:
+      context: .
+      dockerfile: Dockerfile.mintd
     container_name: cdk-mintd-mutinynet
     restart: unless-stopped
     ports:

@@ -1,0 +1,10 @@
+FROM rust:1-alpine AS builder
+RUN apk add --no-cache git musl-dev openssl-dev pkgconfig
+RUN git clone --depth 1 https://github.com/cashubtc/cdk.git /cdk
+WORKDIR /cdk
+RUN cargo build --release --bin mintd
+
+FROM alpine:latest
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /cdk/target/release/mintd /usr/local/bin/mintd
+ENTRYPOINT ["mintd"]

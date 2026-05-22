@@ -34,8 +34,18 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: cdk-arkade-payment-processor:local
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=processor
+          cache-to: type=gha,mode=max,scope=processor
+
+      - name: Build CDK mintd from master
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.mintd
+          load: true
+          tags: cdk-mintd:master
+          cache-from: type=gha,scope=mintd
+          cache-to: type=gha,mode=max,scope=mintd
 
       - name: Prepare env file
         run: |
