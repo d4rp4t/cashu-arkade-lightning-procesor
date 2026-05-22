@@ -14,12 +14,21 @@ builder.Services.AddArkadePaymentProcessor(builder.Configuration);
 
 var app = builder.Build();
 
-await app.Services.GetRequiredService<MigrationRunner>().ExecuteAsync();
-await EnsureProcessorWalletAsync(app.Services);
+using var startupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+try
+{
+    await app.Services.GetRequiredService<MigrationRunner>().ExecuteAsync(startupCts.Token);
+    await EnsureProcessorWalletAsync(app.Services, startupCts.Token);
+}
+catch (Exception ex)
+{
+    app.Logger.LogCritical(ex, "Startup failed — check postgres and ark connectivity");
+    throw;
+}
 
 app.Use(async (ctx, next) =>
 {
-    if (!ctx.ValidateVersion())
+    if (ctx.Request.ContentType?.StartsWith("application/grpc") == true && !ctx.ValidateVersion())
     {
         throw new RpcException(new Status(StatusCode.FailedPrecondition,
                 $"Invalid protocol version! Expected: {VersionValidatoor.ProtocolVersion}"));
@@ -66,7 +75,7 @@ static void LoadDotEnv(string rootPath)
     }
 }
 
-static async Task EnsureProcessorWalletAsync(IServiceProvider services)
+static async Task EnsureProcessorWalletAsync(IServiceProvider services, CancellationToken cancellationToken = default)
 {
     using var scope = services.CreateScope();
     var options = scope.ServiceProvider.GetRequiredService<IOptions<ProcessorOptions>>().Value;
@@ -85,7 +94,7 @@ static async Task EnsureProcessorWalletAsync(IServiceProvider services)
     }
 
     var transport = scope.ServiceProvider.GetRequiredService<IClientTransport>();
-    var serverInfo = await transport.GetServerInfoAsync();
+    var serverInfo = await transport.GetServerInfoAsync(cancellationToken);
     var destination = string.IsNullOrWhiteSpace(options.FundingAddress) ? null : options.FundingAddress;
     var wallet = await WalletFactory.CreateWallet(options.WalletSecret, destination, serverInfo);
     wallet = wallet with { Id = options.WalletId };

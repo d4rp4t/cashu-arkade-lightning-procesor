@@ -57,7 +57,7 @@ services:
       CDK_MINTD_MINT_MOTD: "Mutinynet only. Do not use with real funds."
       CDK_MINTD_LN_BACKEND: grpcprocessor
       CDK_MINTD_GRPC_PAYMENT_PROCESSOR_SUPPORTED_UNITS: sat
-      CDK_MINTD_GRPC_PAYMENT_PROCESSOR_ADDRESS: http://cdk-arkade-payment-processor-mutinynet
+      CDK_MINTD_GRPC_PAYMENT_PROCESSOR_ADDRESS: http://cdk-arkade-payment-processor
       CDK_MINTD_GRPC_PAYMENT_PROCESSOR_PORT: 8080
     depends_on:
       - cdk-arkade-payment-processor

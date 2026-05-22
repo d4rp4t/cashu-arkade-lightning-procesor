@@ -92,8 +92,23 @@ jobs:
           curl -fsS http://localhost:7070/v1/info >/dev/null
           curl -fsS http://localhost:9069/version >/dev/null
 
-      - name: Build and start backend stack
-        run: docker compose up -d --build cdk-arkade-payment-processor cdk-mintd
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: NArkNut/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: cdk-arkade-payment-processor:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start backend stack
+        run: docker compose up -d cdk-arkade-payment-processor cdk-mintd
+        timeout-minutes: 3
 
       - name: Wait for backend container
         run: |
