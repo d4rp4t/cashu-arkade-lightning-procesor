@@ -38,7 +38,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=processor
 
       - name: Pull CDK mintd image
-        run: docker pull cashubtc/mintd:0.17.0rc0
+        run: docker pull cashubtc/mintd:0.17.0-rc.0
 
       - name: Prepare env file
         run: |
