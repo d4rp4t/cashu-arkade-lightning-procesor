@@ -37,15 +37,8 @@ jobs:
           cache-from: type=gha,scope=processor
           cache-to: type=gha,mode=max,scope=processor
 
-      - name: Build CDK mintd from master
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.mintd
-          load: true
-          tags: cdk-mintd:master
-          cache-from: type=gha,scope=mintd
-          cache-to: type=gha,mode=max,scope=mintd
+      - name: Pull CDK mintd image
+        run: docker pull cashubtc/mintd:0.17.0rc0
 
       - name: Prepare env file
         run: |
