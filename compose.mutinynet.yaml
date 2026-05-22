@@ -17,6 +17,7 @@ services:
 
   cdk-arkade-payment-processor:
     container_name: cdk-arkade-payment-processor-mutinynet
+    image: cdk-arkade-payment-processor:local
     platform: linux/amd64
     build:
       context: .

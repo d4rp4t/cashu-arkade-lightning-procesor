@@ -1,4 +1,4 @@
-name: Regtest Backend E2E
+name: Mutinynet Backend E2E
 
 on:
   workflow_dispatch:
@@ -8,9 +8,9 @@ on:
       - main
 
 jobs:
-  regtest-e2e:
+  mutinynet-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
       - name: Checkout (with submodules)
@@ -22,75 +22,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-
-      - name: Setup Go (for nigiri build)
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
-
-      - name: Cache nigiri build
-        uses: actions/cache@v4
-        with:
-          path: submodules/NArk/regtest/_build
-          key: nigiri-${{ runner.os }}-${{ hashFiles('submodules/NArk/regtest/.env.defaults', 'submodules/NArk/.env.regtest') }}
-
-      - name: Prepare env files
-        run: |
-          cp .env.example .env
-          # load_env() in start-env.sh looks for the override at $SCRIPT_DIR/../.env.regtest,
-          # which resolves to submodules/NArk/.env.regtest (not the repo root).
-          # BITCOIN_LOW_FEE=false skips the in-script bitcoin restart — our dedicated
-          # IBD-fix step below owns that restart, so we avoid restarting twice.
-          cat > submodules/NArk/.env.regtest <<'EOF'
-          NIGIRI_BRANCH=master
-          BITCOIN_LOW_FEE=false
-          EOF
-
-      - name: Start Arkade regtest stack
-        timeout-minutes: 20
-        run: |
-          chmod +x submodules/NArk/regtest/*.sh submodules/NArk/regtest/lib/*.sh
-          ./submodules/NArk/regtest/start-env.sh
-
-      - name: Fix Bitcoin Core v30 + NBXplorer compatibility
-        run: |
-          # Bitcoin Core v30 requires enough chain work to exit Initial Block Download.
-          # In regtest the minimum chainwork is reached after ~600 blocks.
-          # NBXplorer won't sync while Bitcoin is in IBD.
-          docker exec bitcoin sh -c 'echo "whitelist=0.0.0.0/0" >> /data/.bitcoin/bitcoin.conf'
-          docker restart bitcoin
-          sleep 10
-
-          ADDR=$(docker exec bitcoin bitcoin-cli -regtest getnewaddress)
-          for i in $(seq 1 35); do
-            IBD=$(docker exec bitcoin bitcoin-cli -regtest getblockchaininfo 2>/dev/null \
-              | grep '"initialblockdownload"' | grep -c 'false' || true)
-            if [ "$IBD" -gt 0 ]; then
-              echo "Bitcoin Core exited IBD after $(( i * 20 )) additional blocks"
-              break
-            fi
-            docker exec bitcoin bitcoin-cli -regtest generatetoaddress 20 "$ADDR" > /dev/null
-          done
-
-          docker exec bitcoin bitcoin-cli -regtest getblockchaininfo \
-            | grep -E '"blocks"|"initialblockdownload"|"verificationprogress"'
-
-          NBXPLORER=$(docker ps --format '{{.Names}}' | grep nbxplorer | head -1)
-          docker restart "$NBXPLORER"
-
-      - name: Wait for NBXplorer and Ark services
-        run: |
-          for i in $(seq 1 90); do
-            if curl -fsS http://localhost:32838/v1/cryptos/btc/status 2>/dev/null \
-                | grep -q '"isFullySynched":true'; then
-              echo "NBXplorer ready"
-              break
-            fi
-            sleep 2
-          done
-          curl -fsS http://localhost:32838/v1/cryptos/btc/status | grep '"isFullySynched":true'
-          curl -fsS http://localhost:7070/v1/info >/dev/null
-          curl -fsS http://localhost:9069/version >/dev/null
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -106,20 +37,30 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Start backend stack
-        run: docker compose up -d cdk-arkade-payment-processor cdk-mintd
+      - name: Prepare env file
+        run: |
+          cat > .env.ci <<'EOF'
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          PROCESSOR_WALLET_SECRET=abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+          CDK_MINTD_MNEMONIC=monkey chase banana monkey chase banana monkey chase banana monkey chase wrong
+          CDK_MINTD_MINT_NAME=Arkade CI Mint
+          EOF
+
+      - name: Start mutinynet stack
+        run: docker compose -f compose.mutinynet.yaml --env-file .env.ci up -d
         timeout-minutes: 3
 
-      - name: Wait for backend container
+      - name: Wait for backend
         run: |
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:8080/ >/dev/null 2>&1; then
+            if curl -fsS --http2-prior-knowledge http://localhost:8080/ >/dev/null 2>&1; then
               echo "Backend ready"
               break
             fi
             sleep 2
           done
-          curl -fsS http://localhost:8080/
+          curl -fsS --http2-prior-knowledge http://localhost:8080/
 
       - name: Wait for CDK mintd
         run: |
@@ -138,33 +79,23 @@ jobs:
         env:
           RUN_REGTEST_INTEGRATION: "1"
 
-      - name: Collect backend logs on failure
+      - name: Collect logs on failure
         if: failure()
         run: |
-          docker compose logs --no-color cdk-arkade-payment-processor > /tmp/processor-logs.txt 2>&1 || true
-          docker compose logs --no-color cdk-mintd > /tmp/mintd-logs.txt 2>&1 || true
-
-      - name: Collect regtest logs on failure
-        if: failure()
-        run: |
-          docker ps -a > /tmp/docker-ps.txt 2>&1 || true
-          docker logs ark > /tmp/arkd-logs.txt 2>&1 || true
-          docker logs boltz > /tmp/boltz-logs.txt 2>&1 || true
-          docker logs bitcoin > /tmp/bitcoin-logs.txt 2>&1 || true
-          docker logs boltz-lnd > /tmp/boltz-lnd-logs.txt 2>&1 || true
-          docker logs boltz-fulmine > /tmp/boltz-fulmine-logs.txt 2>&1 || true
-          docker logs nbxplorer > /tmp/nbxplorer-logs.txt 2>&1 || true
-          curl -s http://localhost:32838/v1/cryptos/btc/status > /tmp/nbxplorer-status.txt 2>&1 || true
+          docker compose -f compose.mutinynet.yaml logs --no-color cdk-arkade-payment-processor > /tmp/processor-logs.txt 2>&1 || true
+          docker compose -f compose.mutinynet.yaml logs --no-color cdk-mintd > /tmp/mintd-logs.txt 2>&1 || true
+          docker compose -f compose.mutinynet.yaml logs --no-color postgres > /tmp/postgres-logs.txt 2>&1 || true
 
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: docker-logs
-          path: /tmp/*-logs.txt /tmp/docker-ps.txt /tmp/nbxplorer-status.txt
+          path: |
+            /tmp/processor-logs.txt
+            /tmp/mintd-logs.txt
+            /tmp/postgres-logs.txt
 
       - name: Cleanup
         if: always()
-        run: |
-          docker compose down -v --remove-orphans || true
-          ./submodules/NArk/regtest/clean-env.sh || true
+        run: docker compose -f compose.mutinynet.yaml --env-file .env.ci down -v --remove-orphans || true
