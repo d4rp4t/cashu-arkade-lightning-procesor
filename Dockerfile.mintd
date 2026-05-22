@@ -1,5 +1,5 @@
 FROM rust:1-alpine AS builder
-RUN apk add --no-cache git musl-dev openssl-dev pkgconfig
+RUN apk add --no-cache git musl-dev openssl-dev pkgconfig protobuf-dev
 RUN git clone --depth 1 https://github.com/cashubtc/cdk.git /cdk
 WORKDIR /cdk
 RUN cargo build --release --bin cdk-mintd
