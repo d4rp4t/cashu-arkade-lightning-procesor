@@ -23,8 +23,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore "NArkNut/NArkNut.csproj" \
     --disable-parallel \
     --use-current-runtime \
-    /p:NuGetAudit=false \
-    
+    /p:NuGetAudit=false
 COPY . .
 WORKDIR "/src/NArkNut"
 RUN dotnet build "./NArkNut.csproj" -c $BUILD_CONFIGURATION -o /app/build
