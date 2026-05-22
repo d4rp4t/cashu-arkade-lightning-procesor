@@ -351,7 +351,7 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
     {
         await StreamWalletSwapEvents(
             responseStream,
-            swap => new Proto.PaymentEventResponse { PaymentReceived = MapIncomingPayment(swap) },
+            swap => new Proto.PaymentEventResponse { PaymentReceived = MapAnyIncomingSwap(swap) },
             context.CancellationToken);
     }
 
@@ -360,7 +360,7 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
         IServerStreamWriter<Proto.WaitIncomingPaymentResponse> responseStream,
         ServerCallContext context)
     {
-        await StreamWalletSwapEvents(responseStream, MapIncomingPayment, context.CancellationToken);
+        await StreamWalletSwapEvents(responseStream, MapAnyIncomingSwap, context.CancellationToken);
     }
 
     private async Task StreamWalletSwapEvents<T>(
@@ -387,6 +387,12 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
             await stream.WriteAsync(message, ct);
         }
     }
+
+    private Proto.WaitIncomingPaymentResponse MapAnyIncomingSwap(ArkSwap swap) =>
+        swap.SwapType == ArkSwapType.ChainBtcToArk
+            ? MapOnchainIncoming(new OnchainIncomingPayment(
+                swap.SwapId, swap.Address, swap.ExpectedAmount, swap.Status, swap.CreatedAt, swap.UpdatedAt))
+            : MapIncomingPayment(swap);
 
     private Proto.WaitIncomingPaymentResponse MapIncomingPayment(ArkSwap swap)
     {

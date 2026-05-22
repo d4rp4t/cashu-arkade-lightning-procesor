@@ -49,10 +49,10 @@ public sealed class IncomingPaymentEventBus : IDisposable
 
     private void OnSwapChanged(object? _, ArkSwap swap)
     {
-        if (swap.SwapType != ArkSwapType.ReverseSubmarine || swap.Status != ArkSwapStatus.Settled)
-        {
+        if (swap.Status != ArkSwapStatus.Settled)
             return;
-        }
+        if (swap.SwapType != ArkSwapType.ReverseSubmarine && swap.SwapType != ArkSwapType.ChainBtcToArk)
+            return;
 
         foreach (var subscriber in _subscribers.Values)
         {
