@@ -43,6 +43,12 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
             {
                 Amountless = false,
                 InvoiceDescription = true
+            },
+            Onchain = new Proto.OnchainSettings()
+            {
+                Confirmations = 1,
+                //todo add rest
+                
             }
         };
 
@@ -542,7 +548,7 @@ public sealed class CdkPaymentProcessorGrpcService : Proto.CdkPaymentProcessor.C
         new() { Status = Proto.QuoteState.Unknown, TotalSpent = new Proto.AmountMessage { Value = 0, Unit = _context.Options.Unit } };
 
     private static ulong CalculateFeeSats(long amountSats, BoltzLimits limits)
-        => (ulong)Math.Ceiling(amountSats * (double)limits.FeePercentage / 100.0) + (ulong)limits.MinerFee;
+        => (ulong)Math.Ceiling(amountSats * (double)limits.FeePercentage) + (ulong)limits.MinerFee;
 
     private static RpcException BadRequest(string message)
         => new(new Status(StatusCode.InvalidArgument, message));

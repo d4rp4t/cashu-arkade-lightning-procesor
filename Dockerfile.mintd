@@ -1,0 +1,11 @@
+FROM rust:1-alpine AS builder
+RUN apk add --no-cache git musl-dev openssl-dev pkgconfig protobuf-dev
+ARG CDK_COMMIT=main
+RUN git clone --depth 1 --branch ${CDK_COMMIT} https://github.com/cashubtc/cdk.git /cdk
+WORKDIR /cdk
+RUN cargo build --release --bin cdk-mintd
+
+FROM alpine:latest
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /cdk/target/release/cdk-mintd /usr/local/bin/cdk-mintd
+ENTRYPOINT ["cdk-mintd"]

@@ -17,6 +17,7 @@ services:
 
   cdk-arkade-payment-processor:
     container_name: cdk-arkade-payment-processor-mutinynet
+    image: cdk-arkade-payment-processor:local
     platform: linux/amd64
     build:
       context: .
@@ -42,7 +43,7 @@ services:
     restart: unless-stopped
 
   cdk-mintd:
-    image: cashubtc/mintd:latest
+    image: cashubtc/mintd:0.17.0-rc.0
     container_name: cdk-mintd-mutinynet
     restart: unless-stopped
     ports:

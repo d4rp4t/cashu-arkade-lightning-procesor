@@ -30,7 +30,7 @@ services:
       - nigiri
 
   cdk-mintd:
-    image: cashubtc/mintd:latest
+    image: cashubtc/mintd:0.17.0-rc.0
     container_name: cdk-mintd
     restart: unless-stopped
     ports:

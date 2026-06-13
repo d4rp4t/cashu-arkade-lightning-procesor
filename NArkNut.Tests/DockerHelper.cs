@@ -32,6 +32,16 @@ public static class DockerHelper
     public static async Task<string> SendBitcoinToAddress(string address, decimal amountBtc = 1m, CancellationToken ct = default)
         => (await Exec("bitcoin",
             ["bitcoin-cli", "-rpcwallet=", "sendtoaddress", address, amountBtc.ToString("F8", CultureInfo.InvariantCulture)], ct)).Trim();
+
+    public static async Task<string> GetNewBitcoinAddress(CancellationToken ct = default)
+        => (await Exec("bitcoin", ["bitcoin-cli", "-rpcwallet=", "getnewaddress"], ct)).Trim();
+
+    public static async Task<decimal> GetReceivedByAddress(string address, int minConf = 0, CancellationToken ct = default)
+    {
+        var output = await Exec("bitcoin",
+            ["bitcoin-cli", "-rpcwallet=", "getreceivedbyaddress", address, minConf.ToString(CultureInfo.InvariantCulture)], ct);
+        return decimal.TryParse(output.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0m;
+    }
     public static async Task<string> CreateLndInvoice(long amtSats = 10000, int expirySecs = 30,
         CancellationToken ct = default)
     {
